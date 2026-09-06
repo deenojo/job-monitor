@@ -1,0 +1,49 @@
+{
+  "candidate": {
+    "workplace_preferences": ["remote", "hybrid", "on-site"],
+    "location_preference": "worldwide",
+    "employment_level": "internship"
+  },
+  "role_routes": [
+    {
+      "role": "AI Infrastructure Engineer Intern",
+      "aliases": ["ai infrastructure", "ml infrastructure", "machine learning infrastructure", "ai systems infrastructure"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Infrastructure_Engineer.pdf"
+    },
+    {
+      "role": "AI Platforms Engineer Intern",
+      "aliases": ["ai platform", "ml platform", "machine learning platform", "ai platforms"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Platforms_Engineer.pdf"
+    },
+    {
+      "role": "AI Engineering Intern",
+      "aliases": ["ai engineer", "artificial intelligence engineer", "ai engineering"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Engineering.pdf"
+    },
+    {
+      "role": "AI Product Manager Intern",
+      "aliases": ["ai product manager", "artificial intelligence product manager", "ai product"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Product_Manager.pdf"
+    },
+    {
+      "role": "Generative AI Intern",
+      "aliases": ["generative ai", "genai", "llm engineer", "large language model"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Generative_AI.pdf"
+    },
+    {
+      "role": "AI/ML Engineer Intern",
+      "aliases": ["ai/ml engineer", "machine learning engineer", "ml engineer", "machine-learning engineer"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_ML_Engineer.pdf"
+    },
+    {
+      "role": "Site Reliability Engineer Intern",
+      "aliases": ["site reliability engineer", "site reliability", "sre intern", "devops intern"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Site_Reliability_Engineer.pdf"
+    },
+    {
+      "role": "Product Manager Intern",
+      "aliases": ["product manager", "product management", "technical product manager"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Product_Manager.pdf"
+    }
+  ]
+}

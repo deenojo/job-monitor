@@ -1,0 +1,8 @@
+{
+  "greenhouse_boards": ["stripe", "figma", "datadog", "scaleai", "cloudflare"],
+  "lever_boards": ["anybotics", "xsolla", "waabi"],
+  "public_boards": {
+    "a16z": "https://jobs.a16z.com/jobs",
+    "y_combinator": "https://www.ycombinator.com/jobs"
+  }
+}
