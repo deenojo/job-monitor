@@ -1,7 +1,9 @@
 import json
 import unittest
+from unittest.mock import patch
 
 import job_monitor
+from gmail_mail import GmailConfigurationError, render_job_email, send_test_email
 
 
 class JobMatchingTests(unittest.TestCase):
@@ -27,6 +29,22 @@ class JobMatchingTests(unittest.TestCase):
             job_monitor.canonical_url("https://example.com/job/7/?source=board#apply"),
             "https://example.com/job/7",
         )
+    def test_email_payload_uses_an_escaped_direct_application_link(self):
+        message = render_job_email([{
+            "title": "AI Platform Intern",
+            "company": "Example & Co",
+            "location": "Remote",
+            "matched_role": "AI Platforms Engineer Intern",
+            "resume_path": "C:\\resume.pdf",
+            "url": "https://jobs.example.test/apply?id=3&source=monitor",
+        }])
+        self.assertIn("Example &amp; Co", message)
+        self.assertIn("https://jobs.example.test/apply?id=3&amp;source=monitor", message)
+        self.assertIn("Open application", message)
+    def test_gmail_test_fails_closed_without_credentials(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(GmailConfigurationError):
+                send_test_email()
 
 
 if __name__ == "__main__":

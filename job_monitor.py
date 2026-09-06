@@ -17,6 +17,13 @@ from typing import Any, Iterable
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse, urlunparse
 from urllib.request import Request, urlopen
+from gmail_mail import (
+    GmailConfigurationError,
+    GmailMailError,
+    gmail_status,
+    send_job_email,
+    send_test_email,
+)
 
 ROOT = Path(__file__).resolve().parent
 PROFILE_PATH = ROOT / "profile.json"
@@ -185,6 +192,39 @@ def initialize_database(connection: sqlite3.Connection) -> None:
         )
         """
     )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS deliveries (
+            channel TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            delivered_at TEXT NOT NULL,
+            PRIMARY KEY (channel, fingerprint)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS monitor_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
+    migrated = connection.execute(
+        "SELECT 1 FROM monitor_meta WHERE key = 'channel_delivery_migration'"
+    ).fetchone()
+    if migrated is None:
+        existing = connection.execute("SELECT fingerprint FROM jobs").fetchall()
+        timestamp = now()
+        for channel in ("ntfy", "email"):
+            connection.executemany(
+                "INSERT OR IGNORE INTO deliveries (channel, fingerprint, delivered_at) VALUES (?, ?, ?)",
+                [(channel, row[0], timestamp) for row in existing],
+            )
+        connection.execute(
+            "INSERT INTO monitor_meta (key, value) VALUES ('channel_delivery_migration', ?)",
+            (timestamp,),
+        )
     connection.commit()
 
 
@@ -231,19 +271,36 @@ def save_jobs(jobs: Iterable[dict[str, str | None]], profile: dict[str, Any]) ->
     return inserted
 
 
-def unnotified_jobs(jobs: Iterable[dict[str, str | None]]) -> list[dict[str, str | None]]:
-    ready: list[dict[str, str | None]] = []
+def pending_delivery(channel: str) -> list[dict[str, Any]]:
     with sqlite3.connect(DATABASE_PATH) as connection:
-        for job in jobs:
-            row = connection.execute(
-                "SELECT 1 FROM notifications WHERE fingerprint = ?", (job["fingerprint"],)
-            ).fetchone()
-            if row is None:
-                ready.append(job)
-    return ready
+        connection.row_factory = sqlite3.Row
+        return [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT j.* FROM jobs j
+                LEFT JOIN deliveries d ON d.fingerprint = j.fingerprint AND d.channel = ?
+                WHERE d.fingerprint IS NULL
+                ORDER BY j.first_seen ASC
+                """,
+                (channel,),
+            ).fetchall()
+        ]
 
 
-def send_ntfy(jobs: list[dict[str, str | None]]) -> bool:
+def mark_delivered(channel: str, jobs: Iterable[dict[str, Any]]) -> None:
+    values = [(channel, job["fingerprint"], now()) for job in jobs]
+    if not values:
+        return
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        connection.executemany(
+            "INSERT OR IGNORE INTO deliveries (channel, fingerprint, delivered_at) VALUES (?, ?, ?)",
+            values,
+        )
+        connection.commit()
+
+
+def send_ntfy(jobs: list[dict[str, Any]]) -> bool:
     topic = os.environ.get("JOB_MONITOR_NTFY_TOPIC") or os.environ.get("JOB_MONITOR_NTFY_TOPIC_USER")
     if not topic or not jobs:
         return False
@@ -270,13 +327,6 @@ def send_ntfy(jobs: list[dict[str, str | None]]) -> bool:
     except (HTTPError, URLError) as error:
         print(f"ntfy notification failed: {error}", file=sys.stderr)
         return False
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        timestamp = now()
-        connection.executemany(
-            "INSERT OR IGNORE INTO notifications (fingerprint, notified_at) VALUES (?, ?)",
-            [(job["fingerprint"], timestamp) for job in jobs],
-        )
-        connection.commit()
     return True
 
 
@@ -301,17 +351,46 @@ def collect_all(watchlists: dict[str, Any]) -> tuple[list[dict[str, str | None]]
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-notify", action="store_true", help="Collect and store matches without pushing alerts.")
+    parser.add_argument("--email-test", action="store_true", help="Send a Gmail SMTP test to the configured recipient.")
+    parser.add_argument("--email-status", action="store_true", help="Show whether Gmail SMTP is configured.")
     arguments = parser.parse_args()
+    if arguments.email_test:
+        send_test_email()
+        print("Gmail SMTP test email accepted for delivery.")
+        return 0
+    if arguments.email_status:
+        print(json.dumps(gmail_status(), indent=2))
+        return 0
     profile = load_json(PROFILE_PATH)
     watchlists = load_json(WATCHLIST_PATH)
+    with sqlite3.connect(DATABASE_PATH) as connection:
+        initialize_database(connection)
     collected, failures = collect_all(watchlists)
     new_matches = save_jobs(collected, profile)
-    pending = unnotified_jobs(new_matches)
-    delivered = False if arguments.no_notify else send_ntfy(pending)
+    ntfy_pending = pending_delivery("ntfy")
+    email_pending = pending_delivery("email")
+    ntfy_status = "skipped"
+    email_delivery_status = "skipped"
+    if not arguments.no_notify and ntfy_pending:
+        if send_ntfy(ntfy_pending):
+            mark_delivered("ntfy", ntfy_pending)
+            ntfy_status = "delivered"
+        else:
+            ntfy_status = "failed"
+    if not arguments.no_notify and email_pending:
+        try:
+            send_job_email(email_pending)
+            mark_delivered("email", email_pending)
+            email_delivery_status = "delivered"
+        except GmailConfigurationError:
+            email_delivery_status = "not_configured"
+        except GmailMailError as error:
+            email_delivery_status = f"failed: {error}"
     print(json.dumps({
         "collected": len(collected),
         "new_matches": len(new_matches),
-        "notification_delivered": delivered,
+        "ntfy": ntfy_status,
+        "email": email_delivery_status,
         "source_failures": failures,
     }, indent=2))
     return 0

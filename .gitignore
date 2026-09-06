@@ -1,3 +1,4 @@
 ﻿job_monitor.db
 __pycache__/
 *.py[cod]
+.venv/
