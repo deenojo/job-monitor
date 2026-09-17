@@ -29,7 +29,7 @@ def recent_matches(arguments: dict[str, Any]) -> dict[str, Any]:
     limit = min(max(int(arguments.get("limit", 20)), 1), 100)
     return text_result(database_rows(
         """
-        SELECT fingerprint, title, company, location, source, url, posted_at, first_seen, matched_role, resume_path
+        SELECT fingerprint, title, company, location, source, url, posted_at, first_seen, matched_role, match_tier, resume_path
         FROM jobs ORDER BY first_seen DESC LIMIT ?
         """,
         (limit,),
@@ -48,13 +48,13 @@ def resume_for_role(arguments: dict[str, Any]) -> dict[str, Any]:
     for route in profile["role_routes"]:
         if requested == route["role"].casefold():
             return text_result({"role": route["role"], "resume_path": route["resume"]})
-    return text_result({"error": "Use one of the configured internship role names."})
+    return text_result({"error": "Use one of the configured job role names."})
 
 
 TOOLS = [
     {
         "name": "recent_matches",
-        "description": "List recent internship jobs matched by the local monitor.",
+        "description": "List recent internship and full-time jobs matched by the local monitor.",
         "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 100}}},
     },
     {
@@ -64,7 +64,7 @@ TOOLS = [
     },
     {
         "name": "resume_for_role",
-        "description": "Return the resume path selected for one configured internship role.",
+        "description": "Return the resume path selected for one configured job role.",
         "inputSchema": {"type": "object", "properties": {"role": {"type": "string"}}, "required": ["role"]},
     },
 ]

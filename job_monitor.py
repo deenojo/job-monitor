@@ -65,6 +65,16 @@ def request_text(url: str) -> str:
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json,text/html"})
     with urlopen(request, timeout=30) as response:
         return response.read().decode(response.headers.get_content_charset() or "utf-8", errors="replace")
+def request_json(url: str, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = Request(
+        url,
+        data=data,
+        method=method,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json", "Content-Type": "application/json"},
+    )
+    with urlopen(request, timeout=30) as response:
+        return json.loads(response.read().decode(response.headers.get_content_charset() or "utf-8"))
 
 
 def canonical_url(url: str) -> str:
@@ -83,15 +93,18 @@ def title_is_internship(title: str) -> bool:
 
 
 def match_role(title: str, profile: dict[str, Any]) -> dict[str, str] | None:
-    if not title_is_internship(title):
-        return None
     lowered = title.casefold()
     best: dict[str, str] | None = None
     best_length = 0
     for route in profile["role_routes"]:
         for alias in route["aliases"]:
             if alias in lowered and len(alias) > best_length:
-                best = {"role": route["role"], "resume": route["resume"], "keyword": alias}
+                best = {
+                    "role": route["role"],
+                    "resume": route["resume"],
+                    "tier": route.get("tier", "individual_contributor"),
+                    "keyword": alias,
+                }
                 best_length = len(alias)
     return best
 
@@ -145,6 +158,61 @@ def collect_lever(board: str) -> Iterable[dict[str, str | None]]:
         yield normalized_job("lever", match.group(1), anchor["text"], board, "", url)
 
 
+def collect_ashby(board: str) -> Iterable[dict[str, str | None]]:
+    payload = request_json(f"https://api.ashbyhq.com/posting-api/job-board/{board}?includeCompensation=false")
+    for job in payload.get("jobs", []):
+        if not job.get("isListed", True):
+            continue
+        url = job.get("applyUrl") or job.get("jobUrl") or ""
+        yield normalized_job(
+            "ashby", str(job.get("id") or url), job.get("title", ""), board,
+            job.get("location", ""), url, job.get("publishedAt"),
+        )
+
+
+def collect_smartrecruiters(company: str) -> Iterable[dict[str, str | None]]:
+    payload = request_json(f"https://api.smartrecruiters.com/v1/companies/{company}/postings?limit=100")
+    for job in payload.get("content", []):
+        location = job.get("location", {})
+        location_text = location if isinstance(location, str) else ", ".join(
+            filter(None, [location.get("city"), location.get("region"), location.get("country")])
+        )
+        identifier = str(job.get("id", ""))
+        url = job.get("ref") or f"https://jobs.smartrecruiters.com/{company}/{identifier}"
+        yield normalized_job(
+            "smartrecruiters", identifier or url, job.get("name", ""), company,
+            location_text, url, job.get("releasedDate"),
+        )
+
+
+def collect_workable(account: str) -> Iterable[dict[str, str | None]]:
+    payload = request_json(f"https://apply.workable.com/api/v1/widget/accounts/{account}")
+    for job in payload.get("results", payload.get("jobs", [])):
+        identifier = str(job.get("shortcode") or job.get("id") or "")
+        location = job.get("location", {})
+        location_text = location if isinstance(location, str) else ", ".join(
+            filter(None, [location.get("city"), location.get("region"), location.get("country")])
+        )
+        url = job.get("url") or job.get("application_url") or f"https://apply.workable.com/{account}/j/{identifier}/"
+        yield normalized_job(
+            "workable", identifier or url, job.get("title", ""), account,
+            location_text, url, job.get("published_at") or job.get("created_at"),
+        )
+
+
+def collect_workday(board: dict[str, str]) -> Iterable[dict[str, str | None]]:
+    endpoint = board["url"]
+    payload = request_json(endpoint, "POST", {"limit": 50, "offset": 0, "searchText": ""})
+    for job in payload.get("jobPostings", []):
+        identifier = str(job.get("bulletFields", [""])[0]) + str(job.get("externalPath", ""))
+        location = " / ".join(job.get("locationsText", [])) if isinstance(job.get("locationsText"), list) else job.get("locationsText", "")
+        url = urljoin(endpoint, job.get("externalPath", ""))
+        yield normalized_job(
+            "workday", identifier or url, job.get("title", ""), board.get("name", "workday"),
+            location, url, job.get("postedOn"),
+        )
+
+
 def collect_public_board(source: str, board_url: str) -> Iterable[dict[str, str | None]]:
     parser = AnchorParser()
     parser.feed(request_text(board_url))
@@ -179,11 +247,15 @@ def initialize_database(connection: sqlite3.Connection) -> None:
             first_seen TEXT NOT NULL,
             last_seen TEXT NOT NULL,
             matched_role TEXT,
+            match_tier TEXT,
             resume_path TEXT,
             UNIQUE(source, external_id)
         )
         """
     )
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "match_tier" not in columns:
+        connection.execute("ALTER TABLE jobs ADD COLUMN match_tier TEXT")
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS notifications (
@@ -245,27 +317,35 @@ def save_jobs(jobs: Iterable[dict[str, str | None]], profile: dict[str, Any]) ->
                 continue
             job["fingerprint"] = fingerprint(job)
             timestamp = now()
+            existing = connection.execute("SELECT fingerprint FROM jobs WHERE url = ?", (job["url"],)).fetchone()
+            if existing is not None:
+                connection.execute(
+                    "UPDATE jobs SET last_seen = ?, matched_role = ?, match_tier = ?, resume_path = ? WHERE fingerprint = ?",
+                    (timestamp, matched["role"], matched["tier"], matched["resume"], existing[0]),
+                )
+                continue
             cursor = connection.execute(
                 """
                 INSERT OR IGNORE INTO jobs (
                     fingerprint, source, external_id, title, company, location, url, posted_at,
-                    first_seen, last_seen, matched_role, resume_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    first_seen, last_seen, matched_role, match_tier, resume_path
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job["fingerprint"], job["source"], job["external_id"], job["title"], job["company"],
                     job["location"], job["url"], job["posted_at"], timestamp, timestamp,
-                    matched["role"], matched["resume"],
+                    matched["role"], matched["tier"], matched["resume"],
                 ),
             )
             if cursor.rowcount:
                 job["matched_role"] = matched["role"]
+                job["match_tier"] = matched["tier"]
                 job["resume_path"] = matched["resume"]
                 inserted.append(job)
             else:
                 connection.execute(
-                    "UPDATE jobs SET last_seen = ? WHERE fingerprint = ?",
-                    (timestamp, job["fingerprint"]),
+                    "UPDATE jobs SET last_seen = ?, matched_role = ?, match_tier = ?, resume_path = ? WHERE fingerprint = ?",
+                    (timestamp, matched["role"], matched["tier"], matched["resume"], job["fingerprint"]),
                 )
         connection.commit()
     return inserted
@@ -306,7 +386,7 @@ def send_ntfy(jobs: list[dict[str, Any]]) -> bool:
         return False
     shown = jobs[:5]
     lines = [
-        f"{job['title']} — {job['company']} ({job['location'] or 'location not listed'})\n{job['url']}"
+        f"[{job['match_tier'] or 'individual_contributor'}] {job['title']} — {job['company']} ({job['location'] or 'location not listed'})\n{job['url']}"
         for job in shown
     ]
     extra = f"\n\n+{len(jobs) - len(shown)} more matches in the local job monitor." if len(jobs) > len(shown) else ""
@@ -316,7 +396,7 @@ def send_ntfy(jobs: list[dict[str, Any]]) -> bool:
         data=body.encode("utf-8"),
         method="POST",
         headers={
-            "Title": f"{len(jobs)} new internship match{'es' if len(jobs) != 1 else ''}",
+            "Title": f"{len(jobs)} new job match{'es' if len(jobs) != 1 else ''}",
             "Priority": "high",
             "Tags": "briefcase",
         },
@@ -334,9 +414,12 @@ def collect_all(watchlists: dict[str, Any]) -> tuple[list[dict[str, str | None]]
     jobs: list[dict[str, str | None]] = []
     failures: list[str] = []
     collectors: list[tuple[str, str, Any]] = []
-    collectors.extend(("greenhouse", board, collect_greenhouse) for board in watchlists["greenhouse_boards"])
-    collectors.extend(("lever", board, collect_lever) for board in watchlists["lever_boards"])
-    collectors.extend(("public", source, collect_public_board) for source in watchlists["public_boards"])
+    collectors.extend(("greenhouse", board, collect_greenhouse) for board in watchlists.get("greenhouse_boards", []))
+    collectors.extend(("lever", board, collect_lever) for board in watchlists.get("lever_boards", []))
+    collectors.extend(("ashby", board, collect_ashby) for board in watchlists.get("ashby_boards", []))
+    collectors.extend(("smartrecruiters", company, collect_smartrecruiters) for company in watchlists.get("smartrecruiters_companies", []))
+    collectors.extend(("workable", account, collect_workable) for account in watchlists.get("workable_accounts", []))
+    collectors.extend(("public", source, collect_public_board) for source in watchlists.get("public_boards", {}))
     for source_type, name, collector in collectors:
         try:
             if source_type == "public":
@@ -345,12 +428,18 @@ def collect_all(watchlists: dict[str, Any]) -> tuple[list[dict[str, str | None]]
                 jobs.extend(collector(name))
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError) as error:
             failures.append(f"{source_type}:{name} ({error})")
+    for board in watchlists.get("workday_boards", []):
+        try:
+            jobs.extend(collect_workday(board))
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError) as error:
+            failures.append(f"workday:{board.get('name', 'unknown')} ({error})")
     return jobs, failures
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-notify", action="store_true", help="Collect and store matches without pushing alerts.")
+    parser.add_argument("--baseline", action="store_true", help="Record current matches as already delivered without sending alerts.")
     parser.add_argument("--email-test", action="store_true", help="Send a Gmail SMTP test to the configured recipient.")
     parser.add_argument("--email-status", action="store_true", help="Show whether Gmail SMTP is configured.")
     arguments = parser.parse_args()
@@ -369,6 +458,16 @@ def main() -> int:
     new_matches = save_jobs(collected, profile)
     ntfy_pending = pending_delivery("ntfy")
     email_pending = pending_delivery("email")
+    if arguments.baseline:
+        mark_delivered("ntfy", ntfy_pending)
+        mark_delivered("email", email_pending)
+        print(json.dumps({
+            "collected": len(collected),
+            "new_matches": len(new_matches),
+            "baseline_marked": len(ntfy_pending),
+            "source_failures": failures,
+        }, indent=2))
+        return 0
     ntfy_status = "skipped"
     email_delivery_status = "skipped"
     if not arguments.no_notify and ntfy_pending:

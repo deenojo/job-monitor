@@ -1,6 +1,10 @@
 {
   "greenhouse_boards": ["stripe", "figma", "datadog", "scaleai", "cloudflare"],
   "lever_boards": ["anybotics", "xsolla", "waabi"],
+  "ashby_boards": ["ramp", "notion", "openai"],
+  "smartrecruiters_companies": ["Visa"],
+  "workable_accounts": ["zego"],
+  "workday_boards": [],
   "public_boards": {
     "a16z": "https://jobs.a16z.com/jobs",
     "y_combinator": "https://www.ycombinator.com/jobs"

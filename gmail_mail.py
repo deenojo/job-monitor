@@ -67,12 +67,13 @@ def render_job_email(jobs: list[dict[str, Any]]) -> str:
             f"<strong>{html.escape(job['title'])}</strong> — {html.escape(job['company'])}"
             f"<br>Location: {html.escape(job['location'] or 'not listed')}"
             f"<br>Matched role: {html.escape(job['matched_role'])}"
+            f"<br>Alert tier: {html.escape(job.get('match_tier') or 'individual_contributor')}"
             f"<br>Resume: {html.escape(Path(job['resume_path']).name)}"
             f"<br><a href=\"{html.escape(job['url'], quote=True)}\">Open application</a>"
             "</li>"
         )
     return (
-        "<html><body><h2>New internship job matches</h2>"
+        "<html><body><h2>New job matches</h2>"
         "<p>Review the role and application requirements before submitting.</p>"
         f"<ol>{''.join(rows)}</ol></body></html>"
     )
@@ -96,7 +97,7 @@ def send_message(subject: str, html_body: str) -> None:
 def send_job_email(jobs: list[dict[str, Any]]) -> None:
     if jobs:
         send_message(
-            f"{len(jobs)} new internship job match{'es' if len(jobs) != 1 else ''}",
+            f"{len(jobs)} new job match{'es' if len(jobs) != 1 else ''}",
             render_job_email(jobs),
         )
 

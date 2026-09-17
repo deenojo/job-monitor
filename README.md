@@ -1,15 +1,15 @@
 # Internship Job Monitor
 
-This local monitor checks configured public job sources every 10 minutes, stores matching internship roles, and alerts through both ntfy mobile push and Gmail email. Each matching job is delivered at most once per channel.
+This local monitor checks configured public job sources every five minutes, stores matching internship and full-time roles, and alerts through both ntfy mobile push and Gmail email. Each matching job is delivered at most once per channel.
 
 ## Automatic monitoring
 
-Windows Task Scheduler runs `Warp Job Monitor` every 10 minutes while the user is signed in. The task can run on battery but cannot run while the computer is shut down or asleep.
+Windows Task Scheduler runs `Warp Job Monitor` every five minutes while the user is signed in. The task can run on battery but cannot run while the computer is shut down or asleep.
 
 Each cycle:
 
-1. Reads the configured public Greenhouse, Lever, a16z, and YC job sources.
-2. Keeps internship, co-op, and internship-like postings that match a configured role family.
+1. Reads the configured public Greenhouse, Lever, Ashby, SmartRecruiters, Workable, Workday, a16z, and YC job sources.
+2. Keeps internship and full-time postings that match a configured role family.
 3. Stores a source-specific identity, first-seen timestamp, matching role, selected resume, and direct application URL in a local SQLite database.
 4. Sends the new match through each configured channel independently.
 
@@ -30,9 +30,12 @@ The initial source lists are in `watchlists.json`:
 
 - Greenhouse: Stripe, Figma, Datadog, Scale AI, and Cloudflare
 - Lever: ANYbotics, Xsolla, and Waabi
+- Ashby: Ramp, Notion, and OpenAI
+- SmartRecruiters: Visa
+- Workable: Zego
+- Workday: configured public employer endpoints, initially empty
 - a16z Jobs and YC Work at a Startup public boards
-
-The matching profile and resume routing are in `profile.json`. Only postings whose title identifies an internship, co-op, or internship-like role are saved. The configured role families are AI infrastructure, AI platform, AI engineering, AI product management, generative AI, AI/ML engineering, site reliability engineering, and product management.
+The matching profile and resume routing are in `profile.json`. The configured role families are AI infrastructure, AI platform, AI engineering, AI product management, generative AI, AI/ML engineering, site reliability engineering, product management, AI evaluation engineering, Chief AI Officer/CAIO, AI architecture, growth engineering, technical product management, and technical program management for infrastructure strategy, delivery, or operations. Executive roles are labeled separately in alerts.
 
 LinkedIn is not queried by this script. Create LinkedIn saved searches manually and enable email and app alerts; LinkedIn’s official alerts operate on a daily or weekly cadence.
 ## Gmail email alerts
@@ -89,7 +92,7 @@ The mobile channel can be tested by publishing a labeled message to the configur
 
 ## Run and check the monitor
 
-The task named `Warp Job Monitor` is already enabled and runs every 10 minutes while you are signed in. It can run on battery, but does not run while the computer is shut down or asleep.
+The task named `Warp Job Monitor` is already enabled and runs every five minutes while you are signed in. It can run on battery, but does not run while the computer is shut down or asleep.
 
 Run a manual check:
 
@@ -112,12 +115,16 @@ Within Warp, use the `local-job-monitor` MCP connector:
 
 ## Update the employer watchlists
 
-Edit `watchlists.json` to add a public board identifier:
+Edit `watchlists.json` to add public source identifiers:
 
 - Greenhouse identifier: the segment after `boards.greenhouse.io/`
 - Lever identifier: the segment after `jobs.lever.co/`
+- Ashby identifier: the segment after `jobs.ashbyhq.com/`
+- SmartRecruiters identifier: the company ID in its public careers URL
+- Workable identifier: the account segment after `apply.workable.com/`
+- Workday: add an object with `name` and the employer's complete public `wday/cxs/.../jobs` endpoint
 
-For example, a Greenhouse career URL ending in `/example-company` becomes `"example-company"` in `greenhouse_boards`. Keep JSON valid and use only public company career boards.
+For example, a Greenhouse career URL ending in `/example-company` becomes `"example-company"` in `greenhouse_boards`. Keep JSON valid and use only public company career boards. Indeed is not directly monitored because its documented APIs serve employer partners; add a licensed aggregation API separately if broader Indeed coverage is needed.
 
 Run a manual check after changing the list. Previously unseen matching roles from the new board can trigger one alert.
 
