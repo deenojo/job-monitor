@@ -29,6 +29,14 @@ class JobMatchingTests(unittest.TestCase):
         match = job_monitor.match_role("Chief AI Officer (CAIO)", self.profile)
         self.assertEqual(match["role"], "Chief AI Officer")
         self.assertEqual(match["tier"], "executive")
+    def test_routes_product_owner_roles(self):
+        match = job_monitor.match_role("AI Product Owner", self.profile)
+        self.assertEqual(match["role"], "Product Owner")
+
+    def test_routes_ai_partner_development_roles(self):
+        match = job_monitor.match_role("AI Partner Development - GTM Pod", self.profile)
+        self.assertEqual(match["role"], "AI Partner Development — GTM Pod")
+        self.assertEqual(match["tier"], "business_development")
     @patch("job_monitor.request_json")
     def test_collects_listed_ashby_jobs(self, request_json):
         request_json.return_value = {"jobs": [

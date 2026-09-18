@@ -88,6 +88,18 @@
       "tier": "program_leadership",
       "aliases": ["technical program manager", "infrastructure strategy", "delivery operations", "technical program"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Product_Manager.pdf"
+    },
+    {
+      "role": "Product Owner",
+      "tier": "individual_contributor",
+      "aliases": ["product owner", "ai product owner", "technical product owner"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Product_Manager.pdf"
+    },
+    {
+      "role": "AI Partner Development — GTM Pod",
+      "tier": "business_development",
+      "aliases": ["ai partner development", "ai partnership development", "ai gtm pod", "partner development gtm"],
+      "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Product_Manager.pdf"
     }
   ]
 }
