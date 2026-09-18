@@ -30,6 +30,7 @@ PROFILE_PATH = ROOT / "profile.json"
 WATCHLIST_PATH = ROOT / "watchlists.json"
 DATABASE_PATH = ROOT / "job_monitor.db"
 USER_AGENT = "WarpJobMonitor/1.0 (public-job-monitoring)"
+REQUEST_TIMEOUT_SECONDS = 10
 INTERNSHIP_TERMS = ("intern", "internship", "co-op", "coop")
 
 
@@ -63,7 +64,7 @@ def now() -> str:
 
 def request_text(url: str) -> str:
     request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json,text/html"})
-    with urlopen(request, timeout=30) as response:
+    with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
         return response.read().decode(response.headers.get_content_charset() or "utf-8", errors="replace")
 def request_json(url: str, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
