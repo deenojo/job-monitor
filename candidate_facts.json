@@ -1,0 +1,60 @@
+{
+  "professional_summary": "Engineer and product-oriented technical leader with 7+ years across cloud infrastructure, fintech platforms, reliability engineering, data-driven operations, and an MS in Artificial Intelligence Systems Management at Carnegie Mellon University.",
+  "education": [
+    "MS, Artificial Intelligence Systems Management, Carnegie Mellon University (expected May 2027)",
+    "BS, Computer Science, University of Maryland Global Campus",
+    "BS, Petroleum Engineering, University of Texas Permian Basin"
+  ],
+  "certifications": [
+    "Microsoft Azure DevOps Engineer (AZ-400)",
+    "AWS / Azure Cloud Practitioner",
+    "CISA in progress",
+    "ISO 27001 Awareness"
+  ],
+  "skills": [
+    "Python",
+    "SQL",
+    "AWS",
+    "Azure",
+    "Kubernetes",
+    "CI/CD",
+    "SLI/SLO and error budgets",
+    "Monitoring and observability",
+    "Incident management and root cause analysis",
+    "Data analytics",
+    "AI infrastructure strategy",
+    "Product roadmap prioritization"
+  ],
+  "evidence_by_tier": {
+    "individual_contributor": [
+      "Defined SLI/SLO and error-budget KPIs that reduced incident detection time by 27% while sustaining 99.9% uptime.",
+      "Led Azure DevOps CI/CD pipeline strategy that reduced release risk by 43%.",
+      "Partnered on pipeline integrity and fault-tolerance requirements, mitigating an estimated $2.3M in annual risk exposure."
+    ],
+    "architecture": [
+      "Led a graduate team analysis of a major AI lab's multi-cloud compute stack, workload orchestration, silicon diversification, and cost-to-serve economics.",
+      "Built and operated cloud, deployment, observability, and access-control systems for regulated fintech and banking platforms."
+    ],
+    "program_leadership": [
+      "Defined infrastructure roadmap priorities and KPI governance across engineering, compliance, security, data, and finance stakeholders.",
+      "Co-founded and scaled a real-time fintech platform from 100+ to 800+ users while owning platform and product decisions."
+    ],
+    "business_development": [
+      "Co-founded a fintech platform and owned product and platform decisions across risk systems, monitoring, and trade reconciliation.",
+      "Led cross-functional strategy and stakeholder alignment across technical infrastructure, finance, compliance, and operations."
+    ],
+    "executive": [
+      "Led technical strategy and governance across fintech, banking, and nonprofit organizations, including infrastructure roadmap priorities and funding allocation.",
+      "Produced an evidence-based AI compute-infrastructure investment recommendation covering multi-cloud economics and workload orchestration."
+    ]
+  },
+  "user_required_inputs": [
+    "Work authorization and visa status",
+    "Compensation expectations",
+    "Earliest start date and availability",
+    "Current location and relocation preference",
+    "Any legal, demographic, or eligibility attestations",
+    "Employer-specific application questions",
+    "Reason for interest in the specific company and role"
+  ]
+}

@@ -362,6 +362,9 @@ def save_jobs(jobs: Iterable[dict[str, str | None]], profile: dict[str, Any]) ->
                     (timestamp, matched["role"], matched["tier"], matched["resume"], job["fingerprint"]),
                 )
         connection.commit()
+    if inserted:
+        from review_queue import enqueue_reviews
+        enqueue_reviews(DATABASE_PATH, inserted)
     return inserted
 
 

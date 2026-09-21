@@ -1,9 +1,13 @@
 import json
+import gc
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
 import job_monitor
 from gmail_mail import GmailConfigurationError, render_job_email, send_test_email
+from review_queue import create_package, enqueue_review, get_review, update_review
 
 
 class JobMatchingTests(unittest.TestCase):
@@ -44,6 +48,31 @@ class JobMatchingTests(unittest.TestCase):
             {"title": "AI Partner Development - GTM Pod", "source": "test", "external_id": "two", "company": "Example", "location": "", "url": "https://example.test/two", "posted_at": None},
         ], self.profile)
         self.assertEqual([match["matched_role"] for match in matches], ["Product Owner", "AI Partner Development — GTM Pod"])
+
+    def test_review_queue_creates_factual_review_only_package(self):
+        job = {
+            "fingerprint": "review-test",
+            "title": "AI Infrastructure Engineer",
+            "company": "Example",
+            "location": "Remote",
+            "source": "test",
+            "url": "https://example.test/apply",
+            "matched_role": "AI Infrastructure Engineer",
+            "match_tier": "individual_contributor",
+            "resume_path": "C:\\resume.pdf",
+        }
+        package = create_package(job)
+        self.assertIn("user_required_inputs", package)
+        self.assertIn("does not open forms", package["submission_boundary"])
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "reviews.db"
+            self.assertTrue(enqueue_review(database, job))
+            self.assertFalse(enqueue_review(database, job))
+            review = get_review(database, "review-test")
+            self.assertEqual(review["status"], "pending_review")
+            self.assertTrue(update_review(database, "review-test", status="ready_for_user", notes="Reviewed locally."))
+            self.assertEqual(get_review(database, "review-test")["status"], "ready_for_user")
+            gc.collect()
     @patch("job_monitor.request_json")
     def test_collects_listed_ashby_jobs(self, request_json):
         request_json.return_value = {"jobs": [

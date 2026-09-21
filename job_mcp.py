@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 import sys
 from typing import Any
+from review_queue import get_review, list_reviews
 
 ROOT = Path(__file__).resolve().parent
 DATABASE_PATH = ROOT / "job_monitor.db"
@@ -51,6 +52,16 @@ def resume_for_role(arguments: dict[str, Any]) -> dict[str, Any]:
     return text_result({"error": "Use one of the configured job role names."})
 
 
+def pending_reviews(arguments: dict[str, Any]) -> dict[str, Any]:
+    limit = min(max(int(arguments.get("limit", 20)), 1), 100)
+    return text_result(list_reviews(DATABASE_PATH, "pending_review", limit))
+
+
+def review_package(arguments: dict[str, Any]) -> dict[str, Any]:
+    review = get_review(DATABASE_PATH, arguments.get("fingerprint", ""))
+    return text_result(review or {"error": "Review package not found."})
+
+
 TOOLS = [
     {
         "name": "recent_matches",
@@ -67,6 +78,16 @@ TOOLS = [
         "description": "Return the resume path selected for one configured job role.",
         "inputSchema": {"type": "object", "properties": {"role": {"type": "string"}}, "required": ["role"]},
     },
+    {
+        "name": "pending_reviews",
+        "description": "List local application packages awaiting user review. These packages do not submit applications.",
+        "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 100}}},
+    },
+    {
+        "name": "review_package",
+        "description": "Read a local review-only application package by matched-job fingerprint.",
+        "inputSchema": {"type": "object", "properties": {"fingerprint": {"type": "string"}}, "required": ["fingerprint"]},
+    },
 ]
 
 
@@ -79,7 +100,13 @@ def error(request_id: Any, message: str) -> None:
 
 
 def main() -> int:
-    handlers = {"recent_matches": recent_matches, "job_details": job_details, "resume_for_role": resume_for_role}
+    handlers = {
+        "recent_matches": recent_matches,
+        "job_details": job_details,
+        "resume_for_role": resume_for_role,
+        "pending_reviews": pending_reviews,
+        "review_package": review_package,
+    }
     for line in sys.stdin:
         try:
             message = json.loads(line)

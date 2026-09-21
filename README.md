@@ -95,6 +95,26 @@ Send a Gmail-only test message:
 
 The mobile channel can be tested by publishing a labeled message to the configured ntfy topic. Production job notifications are sent only when the monitor discovers a new matching listing.
 
+## Application review queue
+
+Each newly discovered matching job receives a local `pending_review` package. A package contains the direct application URL, selected resume, factual professional summary, tier-specific evidence, checklist, and user-required input flags. It never opens a job site, uploads documents, completes forms, or submits an application.
+
+Review packages are created only for new matches. Create historical packages only when you intentionally run a backfill.
+
+```powershell
+& py -3 "$HOME\job-monitor\review_queue.py" --list
+& py -3 "$HOME\job-monitor\review_queue.py" --show {{JOB_FINGERPRINT}}
+& py -3 "$HOME\job-monitor\review_queue.py" --note {{JOB_FINGERPRINT}} "Review notes"
+& py -3 "$HOME\job-monitor\review_queue.py" --set-status {{JOB_FINGERPRINT}} ready_for_user
+& py -3 "$HOME\job-monitor\review_queue.py" --set-status {{JOB_FINGERPRINT}} declined
+& py -3 "$HOME\job-monitor\review_queue.py" --export {{JOB_FINGERPRINT}} "$HOME\job-monitor\review-package.json"
+& py -3 "$HOME\job-monitor\review_queue.py" --backfill
+```
+
+Valid statuses are `pending_review`, `ready_for_user`, and `declined`. `ready_for_user` means the package is ready for you to review and apply manually; it does not submit an application.
+
+Within Warp, use `pending_reviews` to list packages and `review_package` to retrieve one by fingerprint.
+
 ## Run and check the monitor
 
 The task named `Warp Job Monitor` is already enabled and runs every five minutes while you are signed in. It can run on battery, but does not run while the computer is shut down or asleep.
