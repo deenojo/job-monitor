@@ -37,6 +37,13 @@ class JobMatchingTests(unittest.TestCase):
         match = job_monitor.match_role("AI Partner Development - GTM Pod", self.profile)
         self.assertEqual(match["role"], "AI Partner Development — GTM Pod")
         self.assertEqual(match["tier"], "business_development")
+
+    def test_evaluates_new_role_routes_without_persistence(self):
+        matches = job_monitor.evaluate_matches([
+            {"title": "Product Owner", "source": "test", "external_id": "one", "company": "Example", "location": "", "url": "https://example.test/one", "posted_at": None},
+            {"title": "AI Partner Development - GTM Pod", "source": "test", "external_id": "two", "company": "Example", "location": "", "url": "https://example.test/two", "posted_at": None},
+        ], self.profile)
+        self.assertEqual([match["matched_role"] for match in matches], ["Product Owner", "AI Partner Development — GTM Pod"])
     @patch("job_monitor.request_json")
     def test_collects_listed_ashby_jobs(self, request_json):
         request_json.return_value = {"jobs": [

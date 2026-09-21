@@ -35,7 +35,12 @@ The initial source lists are in `watchlists.json`:
 - Workable: Zego
 - Workday: configured public employer endpoints, initially empty
 - a16z Jobs and YC Work at a Startup public boards
-The matching profile and resume routing are in `profile.json`. The configured role families are AI infrastructure, AI platform, AI engineering, AI product management, generative AI, AI/ML engineering, site reliability engineering, product management, AI evaluation engineering, Chief AI Officer/CAIO, AI architecture, growth engineering, technical product management, and technical program management for infrastructure strategy, delivery, or operations. Executive roles are labeled separately in alerts.
+The matching profile and resume routing are in `profile.json`. The configured role families are AI infrastructure, AI platform, AI engineering, AI product management, generative AI, AI/ML engineering, Product Owner/AI Product Owner, site reliability engineering, product management, AI evaluation engineering, Chief AI Officer/CAIO, AI architecture, growth engineering, technical product management, technical program management for infrastructure strategy, delivery, or operations, and AI Partner Development/GTM Pod. Executive roles are labeled separately in alerts.
+
+### Explicit resume routes
+
+- Product Owner, AI Product Owner, and Technical Product Owner use `Deen_Ojo_Resume_Product_Manager.pdf`.
+- AI Partner Development, AI Partnership Development, AI GTM Pod, and Partner Development GTM use `Deen_Ojo_Resume_AI_Product_Manager.pdf` and are tagged `business_development`.
 
 LinkedIn is not queried by this script. Create LinkedIn saved searches manually and enable email and app alerts; LinkedIn’s official alerts operate on a daily or weekly cadence.
 ## Gmail email alerts
@@ -100,6 +105,14 @@ Run a manual check:
 powershell -NoProfile -ExecutionPolicy Bypass -File "$HOME\job-monitor\run-monitor.ps1"
 ```
 The command returns a JSON summary. `new_matches` counts first-time matching listings found in that run; `ntfy` and `email` report individual channel outcomes; `source_failures` lists any job source that could not be reached.
+
+Run a no-side-effect live dry run:
+
+```powershell
+& py -3 "$HOME\job-monitor\job_monitor.py" --dry-run
+```
+
+Dry-run mode reads the live configured sources and prints matching-role counts and sample application links. It does not modify the SQLite database, mark deliveries, or send Gmail or ntfy alerts.
 
 Check the scheduled task:
 

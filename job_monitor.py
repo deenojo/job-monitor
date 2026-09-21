@@ -109,6 +109,19 @@ def match_role(title: str, profile: dict[str, Any]) -> dict[str, str] | None:
                 best_length = len(alias)
     return best
 
+def evaluate_matches(jobs: Iterable[dict[str, str | None]], profile: dict[str, Any]) -> list[dict[str, str | None]]:
+    matches: list[dict[str, str | None]] = []
+    for job in jobs:
+        match = match_role(job["title"] or "", profile)
+        if match is not None:
+            matches.append({
+                **job,
+                "matched_role": match["role"],
+                "match_tier": match["tier"],
+                "resume_path": match["resume"],
+            })
+    return matches
+
 
 def normalized_job(
     source: str,
@@ -441,6 +454,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-notify", action="store_true", help="Collect and store matches without pushing alerts.")
     parser.add_argument("--baseline", action="store_true", help="Record current matches as already delivered without sending alerts.")
+    parser.add_argument("--dry-run", action="store_true", help="Collect and evaluate matches without database writes or alerts.")
     parser.add_argument("--email-test", action="store_true", help="Send a Gmail SMTP test to the configured recipient.")
     parser.add_argument("--email-status", action="store_true", help="Show whether Gmail SMTP is configured.")
     arguments = parser.parse_args()
@@ -453,9 +467,22 @@ def main() -> int:
         return 0
     profile = load_json(PROFILE_PATH)
     watchlists = load_json(WATCHLIST_PATH)
+    collected, failures = collect_all(watchlists)
+    if arguments.dry_run:
+        matches = evaluate_matches(collected, profile)
+        role_counts: dict[str, int] = {}
+        for job in matches:
+            role_counts[job["matched_role"]] = role_counts.get(job["matched_role"], 0) + 1
+        print(json.dumps({
+            "collected": len(collected),
+            "dry_run_matches": len(matches),
+            "matches_by_role": role_counts,
+            "sample_matches": matches[:10],
+            "source_failures": failures,
+        }, indent=2))
+        return 0
     with sqlite3.connect(DATABASE_PATH) as connection:
         initialize_database(connection)
-    collected, failures = collect_all(watchlists)
     new_matches = save_jobs(collected, profile)
     ntfy_pending = pending_delivery("ntfy")
     email_pending = pending_delivery("email")
