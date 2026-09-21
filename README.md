@@ -149,6 +149,35 @@ Check the scheduled task:
 ```powershell
 schtasks /Query /TN "Warp Job Monitor" /FO LIST /V
 ```
+## Scheduler logs and troubleshooting
+
+The scheduled runner writes a timestamped local execution log outside the repository:
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\WarpJobMonitor\monitor.log"
+```
+
+Each successful entry includes the monitor start time, source collection summary, alert-channel outcome, and process exit code.
+
+Manually trigger the scheduled task without changing its five-minute schedule:
+
+```powershell
+schtasks /Run /TN "Warp Job Monitor"
+```
+
+Check the latest task state and result:
+
+```powershell
+schtasks /Query /TN "Warp Job Monitor" /FO LIST /V
+```
+
+Expected operational state:
+
+- `Scheduled Task State: Enabled`
+- `Status: Ready` between runs
+- `Last Result: 0` after a successful run
+
+If the runner reports a missing virtual environment, recreate it at `job-monitor\.venv` before re-enabling alerts. If a community internship feed is temporarily unavailable, the monitor records it in `source_failures` and continues processing the remaining feeds.
 
 Within Warp, use the `local-job-monitor` MCP connector:
 

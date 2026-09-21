@@ -15,9 +15,20 @@ if ($recipient) {
     $env:JOB_MONITOR_ALERT_EMAIL = $recipient
 }
 $python = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
+$logDirectory = Join-Path $env:LOCALAPPDATA 'WarpJobMonitor'
+$logPath = Join-Path $logDirectory 'monitor.log'
+New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+
+function Write-MonitorLog([string]$Message) {
+    Add-Content -Path $logPath -Value "$(Get-Date -Format o) $Message"
+}
 if (-not (Test-Path $python)) {
-    Write-Error 'Job monitor virtual environment is missing. Recreate it before running scheduled alerts.'
+    Write-MonitorLog 'ERROR: Job monitor virtual environment is missing.'
     exit 1
 }
-& $python "$PSScriptRoot\job_monitor.py"
-exit $LASTEXITCODE
+
+Write-MonitorLog 'Monitor run started.'
+& $python "$PSScriptRoot\job_monitor.py" *>> $logPath
+$exitCode = $LASTEXITCODE
+Write-MonitorLog "Monitor run finished with exit code $exitCode."
+exit $exitCode
