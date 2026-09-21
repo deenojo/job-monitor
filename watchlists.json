@@ -5,6 +5,20 @@
   "smartrecruiters_companies": ["Visa"],
   "workable_accounts": ["zego"],
   "workday_boards": [],
+  "internship_feeds": [
+    {
+      "name": "keryx",
+      "type": "keryx",
+      "enabled": true,
+      "url": "https://raw.githubusercontent.com/GodlyDonuts/keryx/main/data/jobs.json"
+    },
+    {
+      "name": "simplify",
+      "type": "simplify",
+      "enabled": true,
+      "url": "https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md"
+    }
+  ],
   "public_boards": {
     "a16z": "https://jobs.a16z.com/jobs",
     "y_combinator": "https://www.ycombinator.com/jobs"

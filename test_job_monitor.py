@@ -28,6 +28,16 @@ class JobMatchingTests(unittest.TestCase):
     def test_routes_full_time_roles(self):
         match = job_monitor.match_role("Machine Learning Engineer", self.profile)
         self.assertEqual(match["role"], "AI/ML Engineer")
+    def test_routes_short_internship_titles(self):
+        expectations = {
+            "AI Intern": "AI Engineering",
+            "Machine Learning Intern": "AI/ML Engineer",
+            "SRE Intern": "Site Reliability Engineer",
+            "Product Intern": "Product Manager",
+        }
+        for title, role in expectations.items():
+            with self.subTest(title=title):
+                self.assertEqual(job_monitor.match_role(title, self.profile)["role"], role)
 
     def test_tags_executive_ai_roles(self):
         match = job_monitor.match_role("Chief AI Officer (CAIO)", self.profile)
@@ -48,6 +58,35 @@ class JobMatchingTests(unittest.TestCase):
             {"title": "AI Partner Development - GTM Pod", "source": "test", "external_id": "two", "company": "Example", "location": "", "url": "https://example.test/two", "posted_at": None},
         ], self.profile)
         self.assertEqual([match["matched_role"] for match in matches], ["Product Owner", "AI Partner Development — GTM Pod"])
+
+    def test_rejects_unsafe_community_application_urls(self):
+        self.assertIsNone(job_monitor.safe_application_url("http://example.test/apply"))
+        self.assertIsNone(job_monitor.safe_application_url("https://localhost/apply"))
+        self.assertIsNone(job_monitor.safe_application_url("https://127.0.0.1/apply"))
+        self.assertEqual(job_monitor.safe_application_url("https://example.test/apply?tracking=1"), "https://example.test/apply")
+
+    @patch("job_monitor.conditional_feed_content")
+    def test_collects_verified_keryx_internships(self, feed_content):
+        feed_content.return_value = json.dumps({"jobs": [
+            {"id": "one", "title": "Machine Learning Intern", "cycle": "summer-2027", "company": "Example", "location": "Remote", "apply_url": "https://example.test/apply", "link_status": "ats-verified", "first_seen": "2026-09-21"},
+            {"id": "two", "title": "Software Engineer Intern", "company": "Example", "apply_url": "https://127.0.0.1/apply", "link_status": "ats-verified"},
+            {"id": "three", "title": "Machine Learning Intern", "company": "Example", "apply_url": "https://example.test/closed", "link_status": "ats-verified", "closed_at": "2026-09-21"}
+        ]})
+        jobs = list(job_monitor.collect_keryx({"name": "keryx", "url": "https://feed.test/jobs.json"}, None))
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["source"], "keryx")
+
+    @patch("job_monitor.conditional_feed_content")
+    def test_collects_simplify_internship_rows(self, feed_content):
+        feed_content.return_value = "| Example | AI Engineer Intern | Remote | [Apply](https://example.test/apply) |"
+        jobs = list(job_monitor.collect_simplify({"name": "simplify", "url": "https://feed.test/readme"}, None))
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["title"], "AI Engineer Intern")
+        self.assertEqual(jobs[0]["source"], "simplify")
+
+    @patch("job_monitor.conditional_feed_content", return_value=None)
+    def test_skips_unchanged_internship_feed(self, feed_content):
+        self.assertEqual(list(job_monitor.collect_keryx({"name": "keryx", "url": "https://feed.test/jobs.json"}, None)), [])
 
     def test_review_queue_creates_factual_review_only_package(self):
         job = {

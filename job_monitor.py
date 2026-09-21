@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import hashlib
 import html
 from html.parser import HTMLParser
 import json
+import ipaddress
 import os
 from pathlib import Path
 import re
@@ -76,6 +78,76 @@ def request_json(url: str, method: str = "GET", payload: dict[str, Any] | None =
     )
     with urlopen(request, timeout=30) as response:
         return json.loads(response.read().decode(response.headers.get_content_charset() or "utf-8"))
+
+def safe_application_url(url: str) -> str | None:
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if parsed.scheme != "https" or not hostname or parsed.username or parsed.password:
+        return None
+    if hostname.casefold() == "localhost":
+        return None
+    try:
+        if ipaddress.ip_address(hostname).is_private:
+            return None
+    except ValueError:
+        pass
+    if parsed.port not in (None, 443):
+        return None
+    return canonical_url(url)
+
+def initialize_source_cache(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS source_cache (
+            source_key TEXT PRIMARY KEY,
+            etag TEXT,
+            last_modified TEXT,
+            checked_at TEXT NOT NULL
+        )
+        """
+    )
+    connection.commit()
+
+def conditional_feed_content(feed: dict[str, Any], cache_database: Path | None) -> str | None:
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/json,text/markdown,text/plain"}
+    cache_row = None
+    if cache_database is not None:
+        with closing(sqlite3.connect(cache_database)) as connection:
+            initialize_source_cache(connection)
+            cache_row = connection.execute(
+                "SELECT etag, last_modified FROM source_cache WHERE source_key = ?",
+                (feed["name"],),
+            ).fetchone()
+    if cache_row and cache_row[0]:
+        headers["If-None-Match"] = cache_row[0]
+    if cache_row and cache_row[1]:
+        headers["If-Modified-Since"] = cache_row[1]
+    request = Request(feed["url"], headers=headers)
+    try:
+        with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            content = response.read().decode(response.headers.get_content_charset() or "utf-8", errors="replace")
+            etag = response.headers.get("ETag")
+            last_modified = response.headers.get("Last-Modified")
+    except HTTPError as error:
+        if error.code == 304:
+            return None
+        raise
+    if cache_database is not None:
+        with closing(sqlite3.connect(cache_database)) as connection:
+            initialize_source_cache(connection)
+            connection.execute(
+                """
+                INSERT INTO source_cache (source_key, etag, last_modified, checked_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(source_key) DO UPDATE SET
+                    etag = excluded.etag,
+                    last_modified = excluded.last_modified,
+                    checked_at = excluded.checked_at
+                """,
+                (feed["name"], etag, last_modified, now()),
+            )
+            connection.commit()
+    return content
 
 
 def canonical_url(url: str) -> str:
@@ -226,6 +298,51 @@ def collect_workday(board: dict[str, str]) -> Iterable[dict[str, str | None]]:
             location, url, job.get("postedOn"),
         )
 
+def collect_keryx(feed: dict[str, Any], cache_database: Path | None) -> Iterable[dict[str, str | None]]:
+    content = conditional_feed_content(feed, cache_database)
+    if content is None:
+        return
+    payload = json.loads(content)
+    for job in payload.get("jobs", []):
+        title = job.get("title") or job.get("role") or job.get("position") or ""
+        cycle = str(job.get("cycle") or "")
+        if not re.search(r"\b(?:intern|internship|co-op|coop)\b", f"{title} {cycle}", re.I):
+            continue
+        if job.get("closed_at"):
+            continue
+        link_status = str(job.get("link_status") or "")
+        if link_status and link_status not in {"ats-verified", "structured", "verified"}:
+            continue
+        url = safe_application_url(job.get("apply_url") or job.get("application_url") or job.get("url") or "")
+        if not url:
+            continue
+        yield normalized_job(
+            "keryx", str(job.get("id") or url), title, job.get("company") or "Keryx",
+            job.get("location") or "", url, job.get("first_seen") or job.get("last_changed"),
+        )
+
+def collect_simplify(feed: dict[str, Any], cache_database: Path | None) -> Iterable[dict[str, str | None]]:
+    content = conditional_feed_content(feed, cache_database)
+    if content is None:
+        return
+    for line in content.splitlines():
+        if not re.search(r"\b(?:intern|internship|co-op|coop)\b", line, re.I):
+            continue
+        links = re.findall(r"\[([^\]]+)\]\((https://[^)\s]+)\)", line)
+        if not links:
+            continue
+        url = safe_application_url(links[-1][1])
+        if not url:
+            continue
+        cells = [re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", cell).strip() for cell in line.strip().strip("|").split("|")]
+        values = [cell for cell in cells if cell]
+        title = values[1] if len(values) > 1 else links[0][0]
+        company = values[0] if values else "Simplify"
+        location = values[2] if len(values) > 2 else ""
+        yield normalized_job(
+            "simplify", hashlib.sha256(url.encode()).hexdigest()[:20], title, company, location, url, None,
+        )
+
 
 def collect_public_board(source: str, board_url: str) -> Iterable[dict[str, str | None]]:
     parser = AnchorParser()
@@ -319,7 +436,11 @@ def fingerprint(job: dict[str, str | None]) -> str:
     return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
-def save_jobs(jobs: Iterable[dict[str, str | None]], profile: dict[str, Any]) -> list[dict[str, str | None]]:
+def save_jobs(
+    jobs: Iterable[dict[str, str | None]],
+    profile: dict[str, Any],
+    create_reviews: bool = True,
+) -> list[dict[str, str | None]]:
     inserted: list[dict[str, str | None]] = []
     with sqlite3.connect(DATABASE_PATH) as connection:
         initialize_database(connection)
@@ -362,7 +483,7 @@ def save_jobs(jobs: Iterable[dict[str, str | None]], profile: dict[str, Any]) ->
                     (timestamp, matched["role"], matched["tier"], matched["resume"], job["fingerprint"]),
                 )
         connection.commit()
-    if inserted:
+    if inserted and create_reviews:
         from review_queue import enqueue_reviews
         enqueue_reviews(DATABASE_PATH, inserted)
     return inserted
@@ -427,7 +548,7 @@ def send_ntfy(jobs: list[dict[str, Any]]) -> bool:
     return True
 
 
-def collect_all(watchlists: dict[str, Any]) -> tuple[list[dict[str, str | None]], list[str]]:
+def collect_all(watchlists: dict[str, Any], cache_database: Path | None = None) -> tuple[list[dict[str, str | None]], list[str]]:
     jobs: list[dict[str, str | None]] = []
     failures: list[str] = []
     collectors: list[tuple[str, str, Any]] = []
@@ -450,6 +571,16 @@ def collect_all(watchlists: dict[str, Any]) -> tuple[list[dict[str, str | None]]
             jobs.extend(collect_workday(board))
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError) as error:
             failures.append(f"workday:{board.get('name', 'unknown')} ({error})")
+    for feed in watchlists.get("internship_feeds", []):
+        if not feed.get("enabled", True):
+            continue
+        try:
+            if feed["type"] == "keryx":
+                jobs.extend(collect_keryx(feed, cache_database))
+            elif feed["type"] == "simplify":
+                jobs.extend(collect_simplify(feed, cache_database))
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError) as error:
+            failures.append(f"internship_feed:{feed.get('name', 'unknown')} ({error})")
     return jobs, failures
 
 
@@ -470,7 +601,10 @@ def main() -> int:
         return 0
     profile = load_json(PROFILE_PATH)
     watchlists = load_json(WATCHLIST_PATH)
-    collected, failures = collect_all(watchlists)
+    if not arguments.dry_run:
+        with sqlite3.connect(DATABASE_PATH) as connection:
+            initialize_database(connection)
+    collected, failures = collect_all(watchlists, None if arguments.dry_run else DATABASE_PATH)
     if arguments.dry_run:
         matches = evaluate_matches(collected, profile)
         role_counts: dict[str, int] = {}
@@ -484,9 +618,7 @@ def main() -> int:
             "source_failures": failures,
         }, indent=2))
         return 0
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        initialize_database(connection)
-    new_matches = save_jobs(collected, profile)
+    new_matches = save_jobs(collected, profile, create_reviews=not arguments.baseline)
     ntfy_pending = pending_delivery("ntfy")
     email_pending = pending_delivery("email")
     if arguments.baseline:

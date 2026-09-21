@@ -35,6 +35,8 @@ The initial source lists are in `watchlists.json`:
 - Workable: Zego
 - Workday: configured public employer endpoints, initially empty
 - a16z Jobs and YC Work at a Startup public boards
+- Keryx: structured public internship/new-grad discovery feed with verified applicant links
+- Simplify/Pitt CSC: public tech internship Markdown board
 The matching profile and resume routing are in `profile.json`. The configured role families are AI infrastructure, AI platform, AI engineering, AI product management, generative AI, AI/ML engineering, Product Owner/AI Product Owner, site reliability engineering, product management, AI evaluation engineering, Chief AI Officer/CAIO, AI architecture, growth engineering, technical product management, technical program management for infrastructure strategy, delivery, or operations, and AI Partner Development/GTM Pod. Executive roles are labeled separately in alerts.
 
 ### Explicit resume routes
@@ -43,6 +45,14 @@ The matching profile and resume routing are in `profile.json`. The configured ro
 - AI Partner Development, AI Partnership Development, AI GTM Pod, and Partner Development GTM use `Deen_Ojo_Resume_AI_Product_Manager.pdf` and are tagged `business_development`.
 
 LinkedIn is not queried by this script. Create LinkedIn saved searches manually and enable email and app alerts; LinkedIn’s official alerts operate on a daily or weekly cadence.
+
+### Internship discovery feeds
+
+Keryx and Simplify are community discovery sources, not employer applicant systems of record. Their feeds are version-cached with ETag and Last-Modified metadata, so the monitor checks for updates every five minutes but downloads and parses their large datasets only when changed.
+
+The monitor accepts only HTTPS community application links, rejects localhost/private/IP-literal and nonstandard-port destinations, and deduplicates against first-party ATS URLs. New matched internships follow the same Gmail, ntfy, and review-queue flow as ATS matches. Initial feed imports are baseline-only to avoid a historical alert or review-package burst.
+
+Handshake and WayUp are account-gated and do not offer suitable public APIs, so they are not scraped.
 ## Gmail email alerts
 
 The monitor uses Gmail SMTP (`smtp.gmail.com` on port 465 with TLS) to send job-alert emails. It sends a digest containing the job title, company, location, selected resume filename, and direct application link. It cannot read your mailbox or access job sites.
