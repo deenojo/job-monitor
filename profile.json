@@ -8,49 +8,49 @@
     {
       "role": "AI Infrastructure Engineer",
       "tier": "individual_contributor",
-      "aliases": ["ai infrastructure", "ml infrastructure", "machine learning infrastructure", "ai systems infrastructure"],
+      "aliases": ["ai infrastructure", "ml infrastructure", "machine learning infrastructure", "ai systems infrastructure", "ai infrastructure intern", "ml infrastructure intern", "infrastructure engineering intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Infrastructure_Engineer.pdf"
     },
     {
       "role": "AI Platforms Engineer",
       "tier": "individual_contributor",
-      "aliases": ["ai platform", "ml platform", "machine learning platform", "ai platforms"],
+      "aliases": ["ai platform", "ml platform", "machine learning platform", "ai platforms", "ai platform intern", "ml platform intern", "platform engineering intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Platforms_Engineer.pdf"
     },
     {
       "role": "AI Engineering",
       "tier": "individual_contributor",
-      "aliases": ["ai engineer", "artificial intelligence engineer", "ai engineering"],
+      "aliases": ["ai engineer", "artificial intelligence engineer", "ai engineering", "ai intern", "artificial intelligence intern", "ai engineering intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Engineering.pdf"
     },
     {
       "role": "AI Product Manager",
       "tier": "individual_contributor",
-      "aliases": ["ai product manager", "artificial intelligence product manager", "ai product"],
+      "aliases": ["ai product manager", "artificial intelligence product manager", "ai product", "ai product intern", "ai product management intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_Product_Manager.pdf"
     },
     {
       "role": "Generative AI",
       "tier": "individual_contributor",
-      "aliases": ["generative ai", "genai", "llm engineer", "large language model"],
+      "aliases": ["generative ai", "genai", "llm engineer", "large language model", "generative ai intern", "genai intern", "llm intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Generative_AI.pdf"
     },
     {
       "role": "AI/ML Engineer",
       "tier": "individual_contributor",
-      "aliases": ["ai/ml engineer", "machine learning engineer", "ml engineer", "machine-learning engineer"],
+      "aliases": ["ai/ml engineer", "machine learning engineer", "ml engineer", "machine-learning engineer", "machine learning intern", "ml intern", "ai/ml intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_AI_ML_Engineer.pdf"
     },
     {
       "role": "Site Reliability Engineer",
       "tier": "individual_contributor",
-      "aliases": ["site reliability engineer", "site reliability", "sre", "devops engineer"],
+      "aliases": ["site reliability engineer", "site reliability", "sre", "devops engineer", "site reliability intern", "sre intern", "devops intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Site_Reliability_Engineer.pdf"
     },
     {
       "role": "Product Manager",
       "tier": "individual_contributor",
-      "aliases": ["product manager", "product management"],
+      "aliases": ["product manager", "product management", "product intern", "product management intern"],
       "resume": "C:\\Users\\olait\\Downloads\\resume bank\\Deen_Ojo_Resume_Product_Manager.pdf"
     },
     {
