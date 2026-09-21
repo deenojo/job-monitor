@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import job_monitor
 from gmail_mail import GmailConfigurationError, render_job_email, send_test_email
-from review_queue import create_package, enqueue_review, get_review, update_review
+from review_queue import create_package, enqueue_review, get_review, mark_ready_and_open, update_review
 
 
 class JobMatchingTests(unittest.TestCase):
@@ -72,6 +72,29 @@ class JobMatchingTests(unittest.TestCase):
             self.assertEqual(review["status"], "pending_review")
             self.assertTrue(update_review(database, "review-test", status="ready_for_user", notes="Reviewed locally."))
             self.assertEqual(get_review(database, "review-test")["status"], "ready_for_user")
+            gc.collect()
+
+    @patch("review_queue.webbrowser.open", return_value=True)
+    def test_marking_ready_opens_only_the_direct_application_url(self, browser_open):
+        job = {
+            "fingerprint": "open-test",
+            "title": "AI Infrastructure Engineer",
+            "company": "Example",
+            "location": "Remote",
+            "source": "test",
+            "url": "https://example.test/apply",
+            "matched_role": "AI Infrastructure Engineer",
+            "match_tier": "individual_contributor",
+            "resume_path": "C:\\resume.pdf",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "reviews.db"
+            enqueue_review(database, job)
+            result = mark_ready_and_open(database, "open-test")
+            self.assertTrue(result["updated"])
+            self.assertTrue(result["application_opened"])
+            browser_open.assert_called_once_with("https://example.test/apply", new=2)
+            self.assertEqual(get_review(database, "open-test")["status"], "ready_for_user")
             gc.collect()
     @patch("job_monitor.request_json")
     def test_collects_listed_ashby_jobs(self, request_json):

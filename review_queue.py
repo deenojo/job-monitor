@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import sqlite3
 from typing import Any
+import webbrowser
 
 ROOT = Path(__file__).resolve().parent
 DATABASE_PATH = ROOT / "job_monitor.db"
@@ -96,6 +97,20 @@ def enqueue_review(database_path: Path, job: dict[str, Any]) -> bool:
         )
         connection.commit()
         return bool(cursor.rowcount)
+
+def mark_ready_and_open(database_path: Path, fingerprint: str) -> dict[str, Any]:
+    if not update_review(database_path, fingerprint, status="ready_for_user"):
+        return {"updated": False, "application_opened": False}
+    review = get_review(database_path, fingerprint)
+    if review is None:
+        return {"updated": False, "application_opened": False}
+    url = review["package"]["job"]["application_url"]
+    return {
+        "updated": True,
+        "application_opened": bool(webbrowser.open(url, new=2)),
+        "application_url": url,
+        "submission_boundary": "The browser was opened for manual review only; no form was completed or submitted."
+    }
 
 
 def enqueue_reviews(database_path: Path, jobs: list[dict[str, Any]]) -> int:
@@ -189,7 +204,10 @@ def main() -> int:
     elif arguments.note:
         print_json({"updated": update_review(DATABASE_PATH, arguments.note[0], notes=arguments.note[1])})
     elif arguments.set_status:
-        print_json({"updated": update_review(DATABASE_PATH, arguments.set_status[0], status=arguments.set_status[1])})
+        if arguments.set_status[1] == "ready_for_user":
+            print_json(mark_ready_and_open(DATABASE_PATH, arguments.set_status[0]))
+        else:
+            print_json({"updated": update_review(DATABASE_PATH, arguments.set_status[0], status=arguments.set_status[1])})
     elif arguments.export:
         review = get_review(DATABASE_PATH, arguments.export[0])
         if review is None:

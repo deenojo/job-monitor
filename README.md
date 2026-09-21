@@ -111,7 +111,7 @@ Review packages are created only for new matches. Create historical packages onl
 & py -3 "$HOME\job-monitor\review_queue.py" --backfill
 ```
 
-Valid statuses are `pending_review`, `ready_for_user`, and `declined`. `ready_for_user` means the package is ready for you to review and apply manually; it does not submit an application.
+Valid statuses are `pending_review`, `ready_for_user`, and `declined`. Setting a package to `ready_for_user` opens its stored direct application URL in your default browser for manual completion. It does not upload documents, complete a form, or submit an application.
 
 Within Warp, use `pending_reviews` to list packages and `review_package` to retrieve one by fingerprint.
 
